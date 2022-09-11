@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+option go_package = "github.com/jphillips1212/multiples-pe1/multiples";
+
+package multiples;
+
+// The multiples service definition.
+service Multiples {
+    // Sends a request to calculate multiplesTotal by looping through the total once
+    rpc CalculateMultiplesOneLoop (MultiplesRequest) returns (MultiplesReply) {}
+    // Sends a request to calculate multiplesTotal by looping through each multiple concurrently
+    rpc CalculateMultiplesConcurrent (MultiplesRequest) returns (MultiplesReply) {}
+  }
+  
+  // The request message containing the total, and the multiples to sum from the total.
+  message MultiplesRequest {
+    uint64 total = 1;
+    repeated uint32 multiples = 2;
+  }
+  
+  // The response message containing the total of the multiples
+  message MultiplesReply {
+    uint64 total = 1;
+  }
