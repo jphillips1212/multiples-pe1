@@ -177,18 +177,24 @@ func calculateMultiplesOneLoop(total uint64, multiples []uint32) int {
 	return multiplesTotal
 }
 
+// Total contains the multiple total and any errors when calculating the total for concurrency checking
+type Total struct {
+	Total int
+	Error error
+}
+
 // calculateMultiplesConcurrent calculates the total of the multiples by totalling each multiple up to the max concurrently
 func calculateMultiplesConcurrent(total uint64, multiples []uint32) int {
 	// Number of multiples that we need to loop through
 	numMultiples := len(multiples)
 
 	// Array to contain all of the channels, a channel will be assigned to each multiple total that needs to be calculated from sumMultiples
-	chans := []chan int{}
+	chans := []chan Total{}
 
 	// Loop through each multiple and create a new go routine which calls sumMultiples
 	// Add the newly created channel corresponding with this go routine to the chans
 	for i := 0; i < numMultiples; i++ {
-		tmp := make(chan int)
+		tmp := make(chan Total)
 		chans = append(chans, tmp)
 		go sumMultiples(int(multiples[i]), int(total), tmp)
 	}
@@ -197,11 +203,11 @@ func calculateMultiplesConcurrent(total uint64, multiples []uint32) int {
 	wg.Add(len(chans))
 
 	// Aggregate channel for receiving results back from the chans
-	agg := make(chan int)
+	agg := make(chan Total)
 
 	// Loop through each channel created earlier and create a goRoutine to wait listening on each channel
 	for _, ch := range chans {
-		go func(c chan int) {
+		go func(c chan Total) {
 			for total := range c {
 				// Send the total response to the aggregate channel
 				agg <- total
@@ -217,20 +223,46 @@ func calculateMultiplesConcurrent(total uint64, multiples []uint32) int {
 	}()
 
 	multiplesTotal := 0
+	var errs []error
 	for i := range agg {
-		multiplesTotal += i
+		if i.Error != nil {
+			fmt.Println(i.Error)
+			errs = append(errs, i.Error)
+		}
+		multiplesTotal += i.Total
 	}
 
 	return multiplesTotal
 }
 
 // sumMultiples calculates the total of that multiple up to the maximum number provided
-func sumMultiples(multiple, max int, c chan<- int) {
+func sumMultiples(multiple, max int, c chan<- Total) {
 	sum := 0
+	var err error
+
+	if multiple <= 0 {
+		err = fmt.Errorf("multiple value is less than 1 [%d], ", multiple)
+		c <- Total{
+			sum,
+			err,
+		}
+		return
+	}
+	if max <= 0 {
+		err = fmt.Errorf("maximum value provided is less than 1 [%d], ", max)
+		c <- Total{
+			sum,
+			err,
+		}
+		return
+	}
 
 	for i := multiple; i <= max; i += multiple {
 		sum += i
 	}
 
-	c <- sum
+	c <- Total{
+		sum,
+		err,
+	}
 }
